@@ -55,7 +55,38 @@ class ImportLocal extends React.Component<ImportLocalProps, ImportLocalState> {
     window.addEventListener("resize", () => {
       this.setState({ width: document.body.clientWidth });
     });
+
+    // Check for URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const bookUrl = urlParams.get('url');
+    if (bookUrl) {
+      this.handleUrl(bookUrl);
+    }
   }
+
+  handleUrl = async (url: string) => {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const blob = await response.blob();
+      const file = new File([blob], url.split('/').pop() || 'book.epub', { type: 'application/epub+zip' });
+      await this.getMd5WithBrowser(file);
+      const book = await BookUtil.generateBook(
+        file.name,
+        'epub',
+        await fetchMD5(file),
+        file.size,
+        '',
+        await blob.arrayBuffer()
+      );
+      await this.handleAddBook(book, await blob.arrayBuffer());
+    } catch (error) {
+      console.error('Failed to fetch book from URL:', error);
+      toast.error(this.props.t("Import failed"));
+    }
+  };
   handleFilePath = async (filePath: string) => {
     clickFilePath = filePath;
     let md5 = await fetchMD5(await fetchFileFromPath(filePath));
